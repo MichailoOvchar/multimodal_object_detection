@@ -1,115 +1,237 @@
-import labels from "./labels.json";
+/**
+ * Малює об'єкти на canvas.
+ * @param {CanvasRenderingContext2D} ctx - canvas context
+ * @param {Array} detections - масив об'єктів {bbox, score, class}
+ * @param {string} color - колір рамки та тексту
+ */
+function drawDetections(ctx, detections, color = 'lime') {
+    ctx.lineWidth = 2;
+    ctx.font = '16px Arial';
+
+    detections.forEach(({ bbox, score, modelScores, class: label }) => {
+        const [x1, y1, width, height] = bbox;
+        // const width = x2 - x1;
+        // const height = y2 - y1;
+
+        ctx.strokeStyle = color;
+        ctx.strokeRect(x1, y1, width, height);
+
+        let scoreText = '';
+        if(modelScores??false)
+            scoreText = `(m1: ${(modelScores.model1 * 100).toFixed(1)}; m2: ${(modelScores.model2 * 100).toFixed(1)})`;
+        else
+            scoreText = `(${(score * 100).toFixed(1)}%)`;
+
+        const text = `${label} ${scoreText}`;
+        const textWidth = ctx.measureText(text).width;
+        const textHeight = 16;
+
+        ctx.fillStyle = color;
+        ctx.fillRect(x1, y1 - textHeight, textWidth + 6, textHeight);
+        ctx.fillStyle = 'black';
+        ctx.fillText(text, x1 + 3, y1 - 3);
+    });
+}
+
+
+function mergeDetections(detections1, detections2, iouThreshold = 0.5) {
+    const merged = [];
+
+    // Функція для обчислення IoU між двома box
+    function iou(boxA, boxB) {
+        const [ax1, ay1, ax2, ay2] = boxA;
+        const [bx1, by1, bx2, by2] = boxB;
+
+        const x1 = Math.max(ax1, bx1);
+        const y1 = Math.max(ay1, by1);
+        const x2 = Math.min(ax2, bx2);
+        const y2 = Math.min(ay2, by2);
+
+        const intersection = Math.max(0, x2 - x1) * Math.max(0, y2 - y1);
+        const areaA = (ax2 - ax1) * (ay2 - ay1);
+        const areaB = (bx2 - bx1) * (by2 - by1);
+        const union = areaA + areaB - intersection;
+
+        return intersection / union;
+    }
+
+    const used2 = new Set();
+
+    for (let i = 0; i < detections1.length; i++) {
+        const d1 = detections1[i];
+        let matched = false;
+
+        for (let j = 0; j < detections2.length; j++) {
+            if (used2.has(j)) continue;
+            const d2 = detections2[j];
+
+            const sameClass = d1.class === d2.class;
+            const boxIoU = iou(d1.bbox, d2.bbox);
+
+            if (sameClass && boxIoU > iouThreshold) {
+                merged.push({
+                    bbox: [
+                        (d1.bbox[0] + d2.bbox[0]) / 2,
+                        (d1.bbox[1] + d2.bbox[1]) / 2,
+                        (d1.bbox[2] + d2.bbox[2]) / 2,
+                        (d1.bbox[3] + d2.bbox[3]) / 2,
+                    ],
+                    class: d1.class,
+                    score: ((d1.score + d2.score) / 2).toFixed(2),
+                    modelScores: {
+                        model1: d1.score.toFixed(2),
+                        model2: d2.score.toFixed(2)
+                    }
+                });
+                used2.add(j);
+                matched = true;
+                break;
+            }
+        }
+
+        if (!matched) {
+            merged.push({
+                ...d1,
+                modelScores: {
+                    model1: d1.score.toFixed(2),
+                    model2: "-"
+                }
+            });
+        }
+    }
+
+    // Add remaining unmatched from detections2
+    detections2.forEach((d2, j) => {
+        if (!used2.has(j)) {
+            merged.push({
+                ...d2,
+                modelScores: {
+                    model1: "-",
+                    model2: d2.score.toFixed(2)
+                }
+            });
+        }
+    });
+
+    return merged;
+}
+
+function mergeDetectionsSmart(detections1, detections2, iouThreshold = 0.2, proximity = 40) {
+    const all = [...detections1, ...detections2];
+    const merged = [];
+    const used = new Array(all.length).fill(false);
+
+    function getCenter(box) {
+        const [x1, y1, x2, y2] = box;
+        return [(x1 + x2) / 2, (y1 + y2) / 2];
+    }
+
+    function areClose(boxA, boxB) {
+        const [cx1, cy1] = getCenter(boxA);
+        const [cx2, cy2] = getCenter(boxB);
+        const dx = cx1 - cx2;
+        const dy = cy1 - cy2;
+        return Math.sqrt(dx * dx + dy * dy) < proximity;
+    }
+
+    function iou(boxA, boxB) {
+        const [ax1, ay1, ax2, ay2] = boxA;
+        const [bx1, by1, bx2, by2] = boxB;
+
+        const x1 = Math.max(ax1, bx1);
+        const y1 = Math.max(ay1, by1);
+        const x2 = Math.min(ax2, bx2);
+        const y2 = Math.min(ay2, by2);
+
+        const intersection = Math.max(0, x2 - x1) * Math.max(0, y2 - y1);
+        const areaA = (ax2 - ax1) * (ay2 - ay1);
+        const areaB = (bx2 - bx1) * (by2 - by1);
+        const union = areaA + areaB - intersection;
+
+        return intersection / union;
+    }
+
+    for (let i = 0; i < all.length; i++) {
+        if (used[i]) continue;
+
+        const cluster = [all[i]];
+        used[i] = true;
+
+        for (let j = i + 1; j < all.length; j++) {
+            if (used[j]) continue;
+
+            if (areClose(all[i].bbox, all[j].bbox) || iou(all[i].bbox, all[j].bbox) > iouThreshold) {
+                cluster.push(all[j]);
+                used[j] = true;
+            }
+        }
+
+        // Об’єднуємо кластер в один блок
+        const allBoxes = cluster.map(d => d.bbox);
+        const allScores = cluster.map(d => d.score);
+        const allClasses = [...new Set(cluster.map(d => d.class))];
+
+        const minX = Math.min(...allBoxes.map(b => b[0]));
+        const minY = Math.min(...allBoxes.map(b => b[1]));
+        const maxX = Math.max(...allBoxes.map(b => b[2]));
+        const maxY = Math.max(...allBoxes.map(b => b[3]));
+
+        merged.push({
+            bbox: [minX, minY, maxX, maxY],
+            score: (allScores.reduce((a, b) => a + b, 0) / allScores.length).toFixed(2),
+            class: allClasses.length === 1 ? allClasses[0] : allClasses.join(', '),
+            mixed: allClasses.length > 1,
+            count: cluster.length,
+            modelScores: allScores.length > 1 ? {
+                model1: allScores[0].toFixed(2),
+                model2: allScores[1].toFixed(2)
+            }: false
+        });
+    }
+
+    return merged;
+}
+
+
 
 /**
- * Render prediction boxes
- * @param {HTMLCanvasElement} canvasRef canvas tag reference
- * @param {Array} boxes_data boxes array
- * @param {Array} scores_data scores array
- * @param {Array} classes_data class array
- * @param {Array[Number]} ratios boxes ratio [xRatio, yRatio]
+ * Обчислює Intersection over Union для двох bbox
  */
-export const renderBoxes = (
-  canvasRef,
-  boxes_data,
-  scores_data,
-  classes_data,
-  ratios
-) => {
-  const ctx = canvasRef.getContext("2d");
-  ctx.clearRect(0, 0, ctx.canvas.width, ctx.canvas.height); // clean canvas
+function calcIOU(boxA, boxB) {
+    const [x1, y1, x2, y2] = boxA;
+    const [x1b, y1b, x2b, y2b] = boxB;
 
-  const colors = new Colors();
+    const xI1 = Math.max(x1, x1b);
+    const yI1 = Math.max(y1, y1b);
+    const xI2 = Math.min(x2, x2b);
+    const yI2 = Math.min(y2, y2b);
 
-  // font configs
-  const font = `${Math.max(
-    Math.round(Math.max(ctx.canvas.width, ctx.canvas.height) / 40),
-    14
-  )}px Arial`;
-  ctx.font = font;
-  ctx.textBaseline = "top";
+    const interArea = Math.max(0, xI2 - xI1) * Math.max(0, yI2 - yI1);
+    const boxAArea = (x2 - x1) * (y2 - y1);
+    const boxBArea = (x2b - x1b) * (y2b - y1b);
+    const union = boxAArea + boxBArea - interArea;
 
-  for (let i = 0; i < scores_data.length; ++i) {
-    // filter based on class threshold
-    const klass = labels[classes_data[i]];
-    const color = colors.get(classes_data[i]);
-    const score = (scores_data[i] * 100).toFixed(1);
+    return interArea / union;
+}
 
-    let [y1, x1, y2, x2] = boxes_data.slice(i * 4, (i + 1) * 4);
-    x1 *= ratios[0];
-    x2 *= ratios[0];
-    y1 *= ratios[1];
-    y2 *= ratios[1];
-    const width = x2 - x1;
-    const height = y2 - y1;
+/**
+ * Основна функція для відображення результатів
+ * @param {CanvasRenderingContext2D} ctx
+ * @param {Array} yoloDetections
+ * @param {Array} mobilenetDetections
+ * @param {"merge"|"separate"} mode
+ */
+export function renderDetections(ctx, yoloDetections, mobilenetDetections, mode = 'merge') {
+    ctx.clearRect(0, 0, ctx.canvas.width, ctx.canvas.height);
 
-    // draw box.
-    ctx.fillStyle = Colors.hexToRgba(color, 0.2);
-    ctx.fillRect(x1, y1, width, height);
+    // console.log('yolo', yoloDetections[0].bbox);
+    // console.log('mobilenet', mobilenetDetections[0].bbox);
 
-    // draw border box.
-    ctx.strokeStyle = color;
-    ctx.lineWidth = Math.max(
-      Math.min(ctx.canvas.width, ctx.canvas.height) / 200,
-      2.5
-    );
-    ctx.strokeRect(x1, y1, width, height);
-
-    // Draw the label background.
-    ctx.fillStyle = color;
-    const textWidth = ctx.measureText(klass + " - " + score + "%").width;
-    const textHeight = parseInt(font, 10); // base 10
-    const yText = y1 - (textHeight + ctx.lineWidth);
-    ctx.fillRect(
-      x1 - 1,
-      yText < 0 ? 0 : yText, // handle overflow label box
-      textWidth + ctx.lineWidth,
-      textHeight + ctx.lineWidth
-    );
-
-    // Draw labels
-    ctx.fillStyle = "#ffffff";
-    ctx.fillText(klass + " - " + score + "%", x1 - 1, yText < 0 ? 0 : yText);
-  }
-};
-
-class Colors {
-  // ultralytics color palette https://ultralytics.com/
-  constructor() {
-    this.palette = [
-      "#FF3838",
-      "#FF9D97",
-      "#FF701F",
-      "#FFB21D",
-      "#CFD231",
-      "#48F90A",
-      "#92CC17",
-      "#3DDB86",
-      "#1A9334",
-      "#00D4BB",
-      "#2C99A8",
-      "#00C2FF",
-      "#344593",
-      "#6473FF",
-      "#0018EC",
-      "#8438FF",
-      "#520085",
-      "#CB38FF",
-      "#FF95C8",
-      "#FF37C7",
-    ];
-    this.n = this.palette.length;
-  }
-
-  get = (i) => this.palette[Math.floor(i) % this.n];
-
-  static hexToRgba = (hex, alpha) => {
-    const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
-    return result
-      ? `rgba(${[
-          parseInt(result[1], 16),
-          parseInt(result[2], 16),
-          parseInt(result[3], 16),
-        ].join(", ")}, ${alpha})`
-      : null;
-  };
+    if (mode === 'merge') {
+        const merged = mergeDetectionsSmart(yoloDetections, mobilenetDetections);
+        drawDetections(ctx, merged, 'cyan');
+    } else {
+        drawDetections(ctx, yoloDetections, 'lime');     // зелений
+        drawDetections(ctx, mobilenetDetections, 'orange'); // помаранчевий
+    }
 }

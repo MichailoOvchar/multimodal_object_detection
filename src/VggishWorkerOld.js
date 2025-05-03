@@ -1,5 +1,4 @@
 import * as tf from "@tensorflow/tfjs";
-import { renderBoxes } from "./utils/renderBox.js";
 import labels from "./utils/labels.json";
 
 export class VggishWorker{

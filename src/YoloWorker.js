@@ -1,5 +1,4 @@
 import * as tf from "@tensorflow/tfjs";
-import { renderBoxes } from "./renderBox.js";
 import labels from "./labels.json";
 
 export class YoloWorker{
@@ -11,12 +10,16 @@ export class YoloWorker{
 
     detectionInWork = false;
 
+    #eventTarget = null;
+
     model = {
         net: null,
         inputShape: [1, 0, 0, 3],
     };
 
     constructor(callback = () => {}) {
+        this.#eventTarget = new EventTarget();
+
         this.loadModel(callback);
     }
 
@@ -39,25 +42,16 @@ export class YoloWorker{
             this.model = {
                 net: yolo,
                 inputShape: yolo.inputs[0].shape,
-            }; // set model & input shape
+            };
 
 
             tf.dispose([warmupResults, dummyInput]);
 
             callback();
-
-            // console.log(model);
-            //
         });
     }
 
-    /**
-     * Preprocess image / frame before forwarded into the model
-     * @param {HTMLVideoElement|HTMLImageElement} source
-     * @param {Number} modelWidth
-     * @param {Number} modelHeight
-     * @returns input tensor, xRatio and yRatio
-     */
+
     _preprocess (source, modelWidth, modelHeight) {
         let xRatio, yRatio; // ratios for boxes
 
@@ -86,25 +80,20 @@ export class YoloWorker{
         return [input, xRatio, yRatio];
     }
 
-    /**
-     * Function run inference and do detection from source.
-     * @param {HTMLImageElement|HTMLVideoElement} source
-     * @param {tf.GraphModel} model loaded YOLO tensorflow.js model
-     * @param {HTMLCanvasElement} canvasRef canvas reference
-     * @param {VoidFunction} callback function to run after detection process
-     */
-    async detect (source, canvasRef, callback = () => {}) {
+
+    async detect (source, callback = () => {}) {
         let model = this.model;
-        const [modelWidth, modelHeight] = model.inputShape.slice(1, 3); // get model width and height
+        const [modelWidth, modelHeight] = model.inputShape.slice(1, 3);
 
-        tf.engine().startScope(); // start scoping tf engine
-        const [input, xRatio, yRatio] = this._preprocess(source, modelWidth, modelHeight); // preprocess image
+        tf.engine().startScope();
+        const [input, xRatio, yRatio] = this._preprocess(source, modelWidth, modelHeight);
 
-        const res = model.net.execute(input); // inference model
-        const transRes = res.transpose([0, 2, 1]); // transpose result [b, det, n] => [b, n, det]
+        const res = model.net.execute(input);
+        const transRes = res.transpose([0, 2, 1]);
+
         const boxes = tf.tidy(() => {
-            const w = transRes.slice([0, 0, 2], [-1, -1, 1]); // get width
-            const h = transRes.slice([0, 0, 3], [-1, -1, 1]); // get height
+            const w = transRes.slice([0, 0, 2], [-1, -1, 1]);
+            const h = transRes.slice([0, 0, 3], [-1, -1, 1]);
             const x1 = tf.sub(transRes.slice([0, 0, 0], [-1, -1, 1]), tf.div(w, 2)); // x1
             const y1 = tf.sub(transRes.slice([0, 0, 1], [-1, -1, 1]), tf.div(h, 2)); // y1
             return tf
@@ -112,114 +101,115 @@ export class YoloWorker{
                     [
                         y1,
                         x1,
-                        tf.add(y1, h), //y2
-                        tf.add(x1, w), //x2
+                        tf.add(y1, h),
+                        tf.add(x1, w),
                     ],
                     2
                 )
                 .squeeze();
-        }); // process boxes [y1, x1, y2, x2]
+        });
 
         const [scores, classes] = tf.tidy(() => {
-            // class scores
-            const rawScores = transRes.slice([0, 0, 4], [-1, -1, this.numClass]).squeeze(0); // #6 only squeeze axis 0 to handle only 1 class models
+            const rawScores = transRes.slice([0, 0, 4], [-1, -1, this.numClass]).squeeze(0);
             return [rawScores.max(1), rawScores.argMax(1)];
-        }); // get max scores and classes index
+        });
 
         const nms = await tf.image.nonMaxSuppressionAsync(
             boxes,
             scores,
-            500,
+            20,
             0.45,
-            0.2
-        ); // NMS to filter boxes
+            0.3
+        );
 
         const boxes_data = boxes.gather(nms, 0).dataSync();
         const scores_data = scores.gather(nms, 0).dataSync();
         const classes_data = classes.gather(nms, 0).dataSync();
 
-        renderBoxes(canvasRef, boxes_data, scores_data, classes_data, [
-            xRatio,
-            yRatio,
-        ]); // render boxes
-        tf.dispose([res, transRes, boxes, scores, classes, nms]); // clear memory
+        let result = [];
+        for(let i = 0; i < scores_data.length; i++){
+
+            let [y1, x1, y2, x2] = boxes_data.slice(i * 4, (i + 1) * 4);
+            x1 *= xRatio;
+            x2 *= xRatio;
+            y1 *= yRatio;
+            y2 *= yRatio;
+            const width = x2 - x1;
+            const height = y2 - y1;
+
+            result.push({
+                bbox: [x1, y1, width, height],
+                score: scores_data[i],
+                class: labels[classes_data[i]]
+            });
+        }
+
+
+        this._trigger('detected', result);
+
+        tf.dispose([res, transRes, boxes, scores, classes, nms]);
 
         callback();
 
-        tf.engine().endScope(); // end of scoping
+        tf.engine().endScope();
     };
 
-    async blackAndWhiteDetector(vidSource, model, canvasRef, canvasHelp){
+    // async blackAndWhiteDetector(vidSource, model, canvasRef, canvasHelp){
+    //     this.videoSource = vidSource;
+    //     this.modelSettings = model;
+    //     this.canvasSource = canvasRef;
+
+    //     this.detectionInWork = true;
+    //     let myImage = document.createElement('img');
+    //     myImage.width = vidSource.width;
+    //     myImage.height = vidSource.height;
+    //     let _startDetectFrame = async () => {
+    //         myImage.onload = null;
+    //         const ctx = canvasHelp.getContext("2d");
+    //         ctx.drawImage(vidSource, 0, 0, canvasHelp.width, canvasHelp.height);
+
+    //         const imageData = ctx.getImageData(0, 0, canvasHelp.width, canvasHelp.height);
+    //         const data = imageData.data;
+
+    //         for (let i = 0; i < data.length; i += 4) {
+    //             const avg = 0.3 * data[i] + 0.59 * data[i + 1] + 0.11 * data[i + 2];
+
+    //             // Додаємо 6 рівнів контрастності
+    //             // let contrast;
+    //             // if (avg < 43) contrast = 0;
+    //             // else if (avg < 85) contrast = 51;
+    //             // else if (avg < 128) contrast = 102;
+    //             // else if (avg < 170) contrast = 153;
+    //             // else if (avg < 213) contrast = 204;
+    //             // else contrast = 255;
+
+    //             data[i] = data[i + 1] = data[i + 2] = avg;
+    //         }
+
+    //         ctx.putImageData(imageData, 0, 0);
+    //         myImage.onload = async () => {
+    //             await this.detect(myImage, model, canvasRef, () => {
+    //                 if(this.detectionInWork) {
+    //                     requestAnimationFrame(_startDetectFrame); // get another frame
+    //                 }
+    //             });
+    //         };
+
+    //         myImage.src = canvasHelp.toDataURL('image/png');
+    //     }
+    //     _startDetectFrame();
+    // }
+
+    detectVideo(vidSource){
         this.videoSource = vidSource;
-        this.modelSettings = model;
-        this.canvasSource = canvasRef;
-
-        this.detectionInWork = true;
-        let myImage = document.createElement('img');
-        myImage.width = vidSource.width;
-        myImage.height = vidSource.height;
-        let _startDetectFrame = async () => {
-            myImage.onload = null;
-            const ctx = canvasHelp.getContext("2d");
-            ctx.drawImage(vidSource, 0, 0, canvasHelp.width, canvasHelp.height);
-
-            const imageData = ctx.getImageData(0, 0, canvasHelp.width, canvasHelp.height);
-            const data = imageData.data;
-
-            for (let i = 0; i < data.length; i += 4) {
-                const avg = 0.3 * data[i] + 0.59 * data[i + 1] + 0.11 * data[i + 2];
-
-                // Додаємо 6 рівнів контрастності
-                // let contrast;
-                // if (avg < 43) contrast = 0;
-                // else if (avg < 85) contrast = 51;
-                // else if (avg < 128) contrast = 102;
-                // else if (avg < 170) contrast = 153;
-                // else if (avg < 213) contrast = 204;
-                // else contrast = 255;
-
-                data[i] = data[i + 1] = data[i + 2] = avg;
-            }
-
-            ctx.putImageData(imageData, 0, 0);
-            myImage.onload = async () => {
-                await this.detect(myImage, model, canvasRef, () => {
-                    if(this.detectionInWork) {
-                        requestAnimationFrame(_startDetectFrame); // get another frame
-                    }
-                });
-            };
-
-            myImage.src = canvasHelp.toDataURL('image/png');
-        }
-        _startDetectFrame();
-    }
-
-    /**
-     * Function to detect video from every source.
-     * @param {HTMLVideoElement} vidSource video source
-     * @param {tf.GraphModel} model loaded YOLO tensorflow.js model
-     * @param {HTMLCanvasElement} canvasRef canvas reference
-     */
-    detectVideo(vidSource, canvasRef){
-        this.videoSource = vidSource;
-        this.canvasSource = canvasRef;
 
         this.detectionInWork = true;
 
-        /**
-         * Function to detect every frame from video
-         */
         let _startDetectFrame = async () => {
-            if (vidSource.videoWidth === 0 && vidSource.srcObject === null) {
-                const ctx = canvasRef.getContext("2d");
-                ctx.clearRect(0, 0, ctx.canvas.width, ctx.canvas.height); // clean canvas
-                return; // handle if source is closed
-            }
-
-            await this.detect(vidSource, canvasRef, () => {
+            await this.detect(vidSource, () => {
                 if(this.detectionInWork) {
-                    requestAnimationFrame(_startDetectFrame); // get another frame
+                    // requestAnimationFrame(_startDetectFrame);
+                    setTimeout(_startDetectFrame, 200);
                 }
             });
 
@@ -228,4 +218,13 @@ export class YoloWorker{
     };
 
 
+    on(event, callback){
+        this.#eventTarget.addEventListener(event, callback);
+    }
+    off(event, callback){
+        this.#eventTarget.removeEventListener(event, callback);
+    }
+    _trigger(event, detail){
+        this.#eventTarget.dispatchEvent(new CustomEvent(event, {detail: detail}));
+    }
 }
