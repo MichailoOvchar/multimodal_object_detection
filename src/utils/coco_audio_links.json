@@ -1,0 +1,322 @@
+{
+  "person": {
+    "boost": ["people", "music", "instant"],
+    "penalize": ["animal", "nature"]
+  },
+  "bicycle": {
+    "boost": ["people", "vehicle"],
+    "penalize": ["animal", "instant"]
+  },
+  "car": {
+    "boost": ["vehicle", "tools"],
+    "penalize": ["animal", "instant"]
+  },
+  "motorcycle": {
+    "boost": ["vehicle", "tools", "people"],
+    "penalize": ["animal", "instant"]
+  },
+  "airplane": {
+    "boost": ["vehicle", "nature"],
+    "penalize": ["animal"]
+  },
+  "bus": {
+    "boost": ["vehicle", "tools"],
+    "penalize": ["animal", "instant"]
+  },
+  "train": {
+    "boost": ["vehicle", "tools", "people"],
+    "penalize": ["animal", "instant"]
+  },
+  "truck": {
+    "boost": ["vehicle", "tools"],
+    "penalize": ["animal", "instant"]
+  },
+  "boat": {
+    "boost": ["vehicle", "people", "nature"],
+    "penalize": ["animal", "instant"]
+  },
+  "bird": {
+    "boost": ["animal", "nature"],
+    "penalize": ["tools", "instant"]
+  },
+  "cat": {
+    "boost": ["animal", "people"],
+    "penalize": ["tools", "instant"]
+  },
+  "dog": {
+    "boost": ["animal", "people"],
+    "penalize": ["tools", "instant"]
+  },
+  "horse": {
+    "boost": ["animal", "nature"],
+    "penalize": ["tools", "instant"]
+  },
+  "sheep": {
+    "boost": ["animal", "nature"],
+    "penalize": ["tools", "instant"]
+  },
+  "cow": {
+    "boost": ["animal", "nature"],
+    "penalize": ["tools", "instant"]
+  },
+  "elephant": {
+    "boost": ["animal", "nature"],
+    "penalize": ["tools", "vehicle", "instant"]
+  },
+  "bear": {
+    "boost": ["animal", "nature"],
+    "penalize": ["tools", "vehicle", "instant"]
+  },
+  "zebra": {
+    "boost": ["animal", "nature"],
+    "penalize": ["tools", "vehicle", "instant"]
+  },
+  "giraffe": {
+    "boost": ["animal", "nature"],
+    "penalize": ["tools", "vehicle", "instant"]
+  },
+  "cup": {
+    "boost": ["people", "tools", "instant"],
+    "penalize": ["animal", "vehicle"]
+  },
+  "fork": {
+    "boost": ["people", "tools", "instant"],
+    "penalize": ["animal", "vehicle"]
+  },
+  "knife": {
+    "boost": ["people", "tools", "instant"],
+    "penalize": ["animal", "vehicle"]
+  },
+  "spoon": {
+    "boost": ["people", "tools", "instant"],
+    "penalize": ["animal", "vehicle"]
+  },
+  "bottle": {
+    "boost": ["people", "tools", "instant"],
+    "penalize": ["animal", "vehicle"]
+  },
+  "cell phone": {
+    "boost": ["people", "music", "instant"],
+    "penalize": ["animal", "vehicle"]
+  },
+  "laptop": {
+    "boost": ["people", "music", "instant"],
+    "penalize": ["animal", "natural"]
+  },
+  "keyboard": {
+    "boost": ["people", "music", "instant"],
+    "penalize": ["animal", "natural"]
+  },
+  "microwave": {
+    "boost": ["people", "instant"],
+    "penalize": ["animal", "natural"]
+  },
+  "oven": {
+    "boost": ["people", "instant"],
+    "penalize": ["animal", "natural"]
+  },
+  "toaster": {
+    "boost": ["people", "instant"],
+    "penalize": ["animal", "natural"]
+  },
+  "sink": {
+    "boost": ["people", "instant"],
+    "penalize": ["animal", "natural"]
+  },
+  "refrigerator": {
+    "boost": ["people", "instant"],
+    "penalize": ["animal", "natural"]
+  },
+  "traffic light": {
+    "boost": ["people", "vehicle", "instant"],
+    "penalize": ["music", "natural"]
+  },
+  "fire hydrant": {
+    "boost": ["people", "vehicle", "instant"],
+    "penalize": ["music", "natural"]
+  },
+  "stop sign": {
+    "boost": ["people", "vehicle", "instant"],
+    "penalize": ["music", "natural"]
+  },
+  "parking meter": {
+    "boost": ["people", "vehicle", "instant"],
+    "penalize": ["music", "natural"]
+  },
+  "bench": {
+    "boost": ["people", "vehicle", "natural"],
+    "penalize": ["instant"]
+  },
+  "backpack": {
+    "boost": ["people", "music", "natural"],
+    "penalize": ["instant"]
+  },
+  "umbrella": {
+    "boost": ["people", "natural"],
+    "penalize": ["animal"]
+  },
+  "handbag": {
+    "boost": ["people", "music", "natural"],
+    "penalize": ["instant"]
+  },
+  "tie": {
+    "boost": ["people", "music"],
+    "penalize": ["instant"]
+  },
+  "suitcase": {
+    "boost": ["people", "music"],
+    "penalize": ["instant"]
+  },
+  "frisbee": {
+    "boost": ["people", "natural"],
+    "penalize": ["vehicle"]
+  },
+  "skis": {
+    "boost": ["people", "natural"],
+    "penalize": ["vehicle"]
+  },
+  "snowboard": {
+    "boost": ["people", "natural"],
+    "penalize": ["vehicle", "instant"]
+  },
+  "sports ball": {
+    "boost": ["people", "natural"],
+    "penalize": ["vehicle", "instant"]
+  },
+  "kite": {
+    "boost": ["people", "natural"],
+    "penalize": ["vehicle"]
+  },
+  "baseball bat": {
+    "boost": ["people", "instant"],
+    "penalize": ["vehicle"]
+  },
+  "baseball glove": {
+    "boost": ["people", "instant"],
+    "penalize": ["vehicle"]
+  },
+  "skateboard": {
+    "boost": ["people", "instant"],
+    "penalize": ["animal"]
+  },
+  "surfboard": {
+    "boost": ["people", "natural"],
+    "penalize": ["animal"]
+  },
+  "tennis racket": {
+    "boost": ["people", "instant"],
+    "penalize": ["animal"]
+  },
+  "wine glass": {
+    "boost": ["people", "music"],
+    "penalize": ["animal", "vehicle"]
+  },
+  "bowl": {
+    "boost": ["people", "music"],
+    "penalize": ["animal", "vehicle"]
+  },
+  "banana": {
+    "boost": ["people", "natural"],
+    "penalize": ["tools", "vehicle"]
+  },
+  "apple": {
+    "boost": ["people", "natural"],
+    "penalize": ["tools", "vehicle"]
+  },
+  "sandwich": {
+    "boost": ["people", "natural"],
+    "penalize": ["tools", "vehicle"]
+  },
+  "orange": {
+    "boost": ["people", "natural"],
+    "penalize": ["tools", "vehicle"]
+  },
+  "broccoli": {
+    "boost": ["people", "natural"],
+    "penalize": ["tools", "vehicle"]
+  },
+  "carrot": {
+    "boost": ["people", "natural"],
+    "penalize": ["tools", "vehicle"]
+  },
+  "hot dog": {
+    "boost": ["people", "natural"],
+    "penalize": ["tools"]
+  },
+  "pizza": {
+    "boost": ["people", "natural"],
+    "penalize": ["tools"]
+  },
+  "donut": {
+    "boost": ["people", "natural"],
+    "penalize": ["tools"]
+  },
+  "cake": {
+    "boost": ["people", "natural"],
+    "penalize": ["tools", "vehicle"]
+  },
+  "chair": {
+    "boost": ["people", "natural"],
+    "penalize": ["tools", "vehicle"]
+  },
+  "couch": {
+    "boost": ["people", "music"],
+    "penalize": ["tools", "vehicle"]
+  },
+  "potted plant": {
+    "boost": ["people", "music"],
+    "penalize": ["tools", "vehicle"]
+  },
+  "bed": {
+    "boost": ["people", "music"],
+    "penalize": ["tools", "vehicle"]
+  },
+  "dining table": {
+    "boost": ["people", "music"],
+    "penalize": ["tools", "vehicle"]
+  },
+  "toilet": {
+    "boost": ["people"],
+    "penalize": ["tools", "vehicle"]
+  },
+  "tv": {
+    "boost": ["people", "music"],
+    "penalize": ["tools", "vehicle"]
+  },
+  "mouse": {
+    "boost": ["people", "instant"],
+    "penalize": ["tools", "vehicle"]
+  },
+  "remote": {
+    "boost": ["people"],
+    "penalize": ["tools", "vehicle"]
+  },
+  "book": {
+    "boost": ["instant"],
+    "penalize": ["tools", "vehicle"]
+  },
+  "clock": {
+    "boost": ["instant"],
+    "penalize": ["tools", "vehicle"]
+  },
+  "vase": {
+    "boost": ["people", "music"],
+    "penalize": ["tools", "vehicle"]
+  },
+  "scissors": {
+    "boost": ["tools", "people"],
+    "penalize": ["vehicle", "natural"]
+  },
+  "teddy bear": {
+    "boost": ["people"],
+    "penalize": ["tools", "vehicle"]
+  },
+  "hair drier": {
+    "boost": ["tools", "instant"],
+    "penalize": ["vehicle", "natural"]
+  },
+  "toothbrush": {
+    "boost": ["tools", "people", "instant"],
+    "penalize": ["vehicle", "natural", "animal"]
+  }
+}

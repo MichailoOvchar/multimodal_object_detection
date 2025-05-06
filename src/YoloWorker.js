@@ -1,5 +1,5 @@
 import * as tf from "@tensorflow/tfjs";
-import labels from "./labels.json";
+import labels from "./utils/labels.json";
 
 export class YoloWorker{
     numClass = labels.length;

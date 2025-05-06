@@ -1,35 +1,58 @@
-/**
- * Малює об'єкти на canvas.
- * @param {CanvasRenderingContext2D} ctx - canvas context
- * @param {Array} detections - масив об'єктів {bbox, score, class}
- * @param {string} color - колір рамки та тексту
- */
-function drawDetections(ctx, detections, color = 'lime') {
+import classes from "./utils/coco_audio_links.json";
+
+function drawDetections(ctx, detections, audioClass, options = {color: 'lime', debug: false}) {
     ctx.lineWidth = 2;
     ctx.font = '16px Arial';
 
     detections.forEach(({ bbox, score, modelScores, class: label }) => {
         const [x1, y1, width, height] = bbox;
-        // const width = x2 - x1;
-        // const height = y2 - y1;
 
-        ctx.strokeStyle = color;
-        ctx.strokeRect(x1, y1, width, height);
+        let debugText = '';
 
-        let scoreText = '';
-        if(modelScores??false)
-            scoreText = `(m1: ${(modelScores.model1 * 100).toFixed(1)}; m2: ${(modelScores.model2 * 100).toFixed(1)})`;
-        else
-            scoreText = `(${(score * 100).toFixed(1)}%)`;
+        let average = 0;
+        if(modelScores??false){
+            average = (parseFloat(modelScores.model1) + parseFloat(modelScores.model2))/2;
 
-        const text = `${label} ${scoreText}`;
+            debugText = `m1: ${parseFloat(modelScores.model1).toFixed(4)} | m2: ${parseFloat(modelScores.model2).toFixed(4)}`;
+        }
+        else {
+            average = parseFloat(score);
+            debugText = `m1: ${parseFloat(score).toFixed(4)}`;
+        }
+
+        if(classes[label]?.boost?.includes(audioClass)??false){
+            average += 0.15;
+            average = average < 1 || 1;
+
+            debugText += ` | s: +0.15`;
+        }
+        if(classes[label]?.penalize?.includes(audioClass)??false){
+            average -= 0.15;
+
+            debugText += ` | s: -0.15`;
+
+            if(average < 20) return;
+        }
+
+        const text = `${label} (${(average * 100).toFixed(1)}%)`;
         const textWidth = ctx.measureText(text).width;
         const textHeight = 16;
 
-        ctx.fillStyle = color;
+        ctx.fillStyle = options.color;
         ctx.fillRect(x1, y1 - textHeight, textWidth + 6, textHeight);
         ctx.fillStyle = 'black';
         ctx.fillText(text, x1 + 3, y1 - 3);
+
+        if(options.debug){
+            const textWidth = ctx.measureText(debugText).width;
+            ctx.fillStyle = options.color;
+            ctx.fillRect((x1 + width - (textWidth + 6)), y1, textWidth + 6, textHeight);
+            ctx.fillStyle = 'black';
+            ctx.fillText(debugText, (x1 + width - (textWidth + 3)), (y1 + textHeight) - 3);
+        }
+
+        ctx.strokeStyle = options.color;
+        ctx.strokeRect(x1, y1, width, height);
     });
 }
 
@@ -214,24 +237,26 @@ function calcIOU(boxA, boxB) {
     return interArea / union;
 }
 
-/**
- * Основна функція для відображення результатів
- * @param {CanvasRenderingContext2D} ctx
- * @param {Array} yoloDetections
- * @param {Array} mobilenetDetections
- * @param {"merge"|"separate"} mode
- */
-export function renderDetections(ctx, yoloDetections, mobilenetDetections, mode = 'merge') {
+export function renderDetections(ctx, modelData, options = {mode: 'merge', debug: false}) {
     ctx.clearRect(0, 0, ctx.canvas.width, ctx.canvas.height);
 
     // console.log('yolo', yoloDetections[0].bbox);
     // console.log('mobilenet', mobilenetDetections[0].bbox);
 
-    if (mode === 'merge') {
-        const merged = mergeDetectionsSmart(yoloDetections, mobilenetDetections);
-        drawDetections(ctx, merged, 'cyan');
+    if (options?.mode === 'merge') {
+        const merged = mergeDetectionsSmart(modelData.yolo, modelData.mobilenet);
+        drawDetections(ctx, merged, modelData.yamnet, {
+            color: 'cyan',
+            debug: options.debug
+        });
     } else {
-        drawDetections(ctx, yoloDetections, 'lime');     // зелений
-        drawDetections(ctx, mobilenetDetections, 'orange'); // помаранчевий
+        drawDetections(ctx, modelData.yolo, modelData.yamnet, {
+            color: 'lime',
+            debug: options.debug
+        });
+        drawDetections(ctx, modelData.mobilenet, modelData.yamnet, {
+            color: 'orange',
+            debug: options.debug
+        });
     }
 }

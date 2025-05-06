@@ -1,0 +1,35 @@
+{
+  "people": [
+    "speech", "laughter", "cry", "sob", "sigh", "giggle", "babbling", "whisper", "yell", "shout",
+    "conversation", "monologue", "narration", "whimper", "snicker", "chuckle", "hum", "singing",
+    "rapping", "chant", "mantra", "sneeze", "cough", "gasp", "pant", "breathing", "wheeze", "snore"
+  ],
+  "music": [
+    "music", "guitar", "piano", "saxophone", "drum", "violin", "bass", "flute", "synth", "opera",
+    "hip hop", "rock", "jazz", "classical", "electronic", "song", "instrument", "orchestra", "choir",
+    "banjo", "accordion", "harmonica", "bagpipes", "beatboxing"
+  ],
+  "animal": [
+    "dog", "bark", "cat", "meow", "animal", "bird", "chirp", "owl", "cow", "moo", "sheep", "bleat",
+    "horse", "neigh", "pig", "oink", "goat", "duck", "quack", "frog", "insect", "buzz", "bee", "lion",
+    "roar", "tiger", "mouse", "rat", "fly", "cricket", "mosquito", "snake", "purr", "caterwaul"
+  ],
+  "vehicle": [
+    "car", "motorcycle", "truck", "bus", "train", "airplane", "helicopter", "vehicle", "engine",
+    "subway", "horn", "siren", "jet", "skateboard", "bicycle", "boat", "metro", "brake", "tram"
+  ],
+  "nature": [
+    "thunder", "rain", "water", "wind", "wave", "storm", "ocean", "stream", "fire", "crackle",
+    "waterfall", "leaves", "birds", "natural", "environment", "forest", "rural", "animal sound"
+  ],
+  "tools": [
+    "toothbrush", "scissors", "typewriter", "keyboard", "zipper", "vacuum", "microwave", "faucet",
+    "sink", "blender", "hair dryer", "typing", "writing", "tools", "drill", "shaver", "printer",
+    "camera", "hammer", "power tool", "lawn mower"
+  ],
+  "instant": [
+    "explosion", "gunshot", "fireworks", "clap", "bang", "boom", "crash", "click", "snap", "pop",
+    "drop", "break", "smash", "slam", "thump", "whack", "splash", "slap", "crack", "fart"
+  ],
+  "other": []
+}

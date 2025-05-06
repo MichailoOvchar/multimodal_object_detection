@@ -3,6 +3,7 @@ import {YamnetWorker} from "./YamnetWorker.js";
 // import {MobilenetWorker} from "./MobilenetWorker.js";
 import {MobilenetWorker} from "./MobilenetWorkerSSD.js";
 import { renderDetections } from './renderBox.js';
+import yamnetGroup from "./utils/yamnet_clustered.json";
 
 let video = null;
 
@@ -21,6 +22,7 @@ let mobilenetWorker = new MobilenetWorker();
 let soundRes = document.querySelector('.sound-result');
 
 let isMerge = false;
+let isDebug = false;
 
 let modelsResult = {
     yolo: null,
@@ -77,9 +79,11 @@ function startDetection(){
 function loadModel(){
     yamnetWorker.on('detected', function (e){
         // console.log(e.detail);
-        let result = e.detail[0].name;
+        let result = e.detail[0].name.toLowerCase();
 
-        soundRes.innerText = result;
+        modelsResult.yamnet = Object.keys(yamnetGroup).find(key => yamnetGroup[key].includes(result))??'other';
+
+        soundRes.innerText = modelsResult.yamnet;
     });
 
     mobilenetWorker.on('detected', function(e){
@@ -98,7 +102,10 @@ function loadModel(){
 }
 function renderResult(){
     if((modelsResult.yolo??false) && (modelsResult.mobilenet??false))
-        renderDetections(ctx, modelsResult.yolo, modelsResult.mobilenet, isMerge?'merge':'split');
+        renderDetections(ctx, modelsResult, {
+            mode: isMerge?'merge':'split',
+            debug: isDebug
+        });
 }
 
 function yoloModelLoad(){
@@ -159,6 +166,9 @@ async function init() {
 
     document.querySelector('input[name=merge]').addEventListener('change', function(){
         isMerge = !isMerge;
+    })
+    document.querySelector('input[name=debug]').addEventListener('change', function(){
+        isDebug = !isDebug;
     })
 }
 

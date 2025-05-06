@@ -1,5 +1,5 @@
 import * as tf from "@tensorflow/tfjs";
-import labels from "./yamnet-labels.json";
+import labels from "./utils/yamnet-labels.json";
 
 export class YamnetWorker{
     numClass = labels.length;
@@ -66,13 +66,14 @@ export class YamnetWorker{
         let timer = setTimeout(() => {}, 1)
 
         let _startDetectFrame = async () => {
+            // console.log(dataArray.length)
             analyser.getFloatTimeDomainData(dataArray);
 
             if((this.model??false) && this.detectionInWork) {
                 await this.detect(dataArray);
             }
 
-            timer = setTimeout(_startDetectFrame, 50);
+            timer = setTimeout(_startDetectFrame, 200);
         }
         _startDetectFrame();
     }
