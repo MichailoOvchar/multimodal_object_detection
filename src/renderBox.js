@@ -22,7 +22,7 @@ function drawDetections(ctx, detections, audioClass, options = {color: 'lime', d
 
         if(classes[label]?.boost?.includes(audioClass)??false){
             average += 0.15;
-            average = average < 1 || 1;
+            average = average > 1 || 1;
 
             debugText += ` | s: +0.15`;
         }
@@ -34,9 +34,11 @@ function drawDetections(ctx, detections, audioClass, options = {color: 'lime', d
             if(average < 20) return;
         }
 
-        const text = `${label} (${(average * 100).toFixed(1)}%)`;
+        let text = `${label} (${(average * 100).toFixed(1)}%)`;
         const textWidth = ctx.measureText(text).width;
         const textHeight = 16;
+
+        text = text.replaceAll('toothbrush', 'pen');
 
         ctx.fillStyle = options.color;
         ctx.fillRect(x1, y1 - textHeight, textWidth + 6, textHeight);
@@ -57,92 +59,96 @@ function drawDetections(ctx, detections, audioClass, options = {color: 'lime', d
 }
 
 
-function mergeDetections(detections1, detections2, iouThreshold = 0.5) {
+function mergeDetections(model1Detections, model2Detections, iouThreshold = 0.2) {
     const merged = [];
-
-    // Функція для обчислення IoU між двома box
-    function iou(boxA, boxB) {
-        const [ax1, ay1, ax2, ay2] = boxA;
-        const [bx1, by1, bx2, by2] = boxB;
-
-        const x1 = Math.max(ax1, bx1);
-        const y1 = Math.max(ay1, by1);
-        const x2 = Math.min(ax2, bx2);
-        const y2 = Math.min(ay2, by2);
-
-        const intersection = Math.max(0, x2 - x1) * Math.max(0, y2 - y1);
-        const areaA = (ax2 - ax1) * (ay2 - ay1);
-        const areaB = (bx2 - bx1) * (by2 - by1);
-        const union = areaA + areaB - intersection;
-
-        return intersection / union;
-    }
-
+    const used1 = new Set();
     const used2 = new Set();
 
-    for (let i = 0; i < detections1.length; i++) {
-        const d1 = detections1[i];
-        let matched = false;
+    function iou(boxA, boxB) {
+        const [xA1, yA1, xA2, yA2] = boxA;
+        const [xB1, yB1, xB2, yB2] = boxB;
 
-        for (let j = 0; j < detections2.length; j++) {
-            if (used2.has(j)) continue;
-            const d2 = detections2[j];
+        const interX1 = Math.max(xA1, xB1);
+        const interY1 = Math.max(yA1, yB1);
+        const interX2 = Math.min(xA2, xB2);
+        const interY2 = Math.min(yA2, yB2);
 
-            const sameClass = d1.class === d2.class;
-            const boxIoU = iou(d1.bbox, d2.bbox);
+        const interArea = Math.max(0, interX2 - interX1) * Math.max(0, interY2 - interY1);
+        const boxAArea = (xA2 - xA1) * (yA2 - yA1);
+        const boxBArea = (xB2 - xB1) * (yB2 - yB1);
 
-            if (sameClass && boxIoU > iouThreshold) {
-                merged.push({
-                    bbox: [
-                        (d1.bbox[0] + d2.bbox[0]) / 2,
-                        (d1.bbox[1] + d2.bbox[1]) / 2,
-                        (d1.bbox[2] + d2.bbox[2]) / 2,
-                        (d1.bbox[3] + d2.bbox[3]) / 2,
-                    ],
-                    class: d1.class,
-                    score: ((d1.score + d2.score) / 2).toFixed(2),
-                    modelScores: {
-                        model1: d1.score.toFixed(2),
-                        model2: d2.score.toFixed(2)
-                    }
-                });
-                used2.add(j);
-                matched = true;
-                break;
-            }
-        }
-
-        if (!matched) {
-            merged.push({
-                ...d1,
-                modelScores: {
-                    model1: d1.score.toFixed(2),
-                    model2: "-"
-                }
-            });
-        }
+        return interArea / (boxAArea + boxBArea - interArea);
     }
 
-    // Add remaining unmatched from detections2
-    detections2.forEach((d2, j) => {
-        if (!used2.has(j)) {
-            merged.push({
-                ...d2,
-                modelScores: {
-                    model1: "-",
-                    model2: d2.score.toFixed(2)
+    const tryMerge = (preferSameClass = true) => {
+        for (let i = 0; i < model1Detections.length; i++) {
+            if (used1.has(i)) continue;
+
+            const det1 = model1Detections[i];
+            let bestMatch = null;
+            let bestIndex = -1;
+            let bestIoU = 0;
+
+            for (let j = 0; j < model2Detections.length; j++) {
+                if (used2.has(j)) continue;
+
+                const det2 = model2Detections[j];
+                const sameClass = det1.class === det2.class;
+                const currentIoU = iou(det1.bbox, det2.bbox);
+
+                const isValid = currentIoU >= iouThreshold &&
+                    (!preferSameClass || sameClass);
+
+                if (isValid && currentIoU > bestIoU) {
+                    bestMatch = det2;
+                    bestIndex = j;
+                    bestIoU = currentIoU;
                 }
-            });
+            }
+
+            if (bestMatch) {
+                used1.add(i);
+                used2.add(bestIndex);
+                merged.push({
+                    bbox: [
+                        (det1.bbox[0] + bestMatch.bbox[0]) / 2,
+                        (det1.bbox[1] + bestMatch.bbox[1]) / 2,
+                        (det1.bbox[2] + bestMatch.bbox[2]) / 2,
+                        (det1.bbox[3] + bestMatch.bbox[3]) / 2
+                    ],
+                    score: (det1.score + bestMatch.score) / 2,
+                    class: preferSameClass ? det1.class : `${det1.class}+${bestMatch.class}`,
+                    modelScores: {
+                        model1: det1.score,
+                        model2: bestMatch.score
+                    }
+                });
+            }
         }
+    };
+
+    // Крок 1: об'єднуємо тільки ті, що з однаковими класами
+    tryMerge(true);
+
+    // Крок 2: об'єднуємо всі інші, що поруч (навіть якщо класи різні)
+    tryMerge(false);
+
+    // Додаємо не використані блоки
+    model1Detections.forEach((det, i) => {
+        if (!used1.has(i)) merged.push(det);
+    });
+
+    model2Detections.forEach((det, i) => {
+        if (!used2.has(i)) merged.push(det);
     });
 
     return merged;
 }
 
-function mergeDetectionsSmart(detections1, detections2, iouThreshold = 0.2, proximity = 40) {
-    const all = [...detections1, ...detections2];
+function mergeDetections2(detections1, detections2, iouThreshold = 0.2, proximity = 40) {
     const merged = [];
-    const used = new Array(all.length).fill(false);
+    const used1 = new Array(detections1.length).fill(false);
+    const used2 = new Array(detections2.length).fill(false);
 
     function getCenter(box) {
         const [x1, y1, x2, y2] = box;
@@ -174,68 +180,71 @@ function mergeDetectionsSmart(detections1, detections2, iouThreshold = 0.2, prox
         return intersection / union;
     }
 
-    for (let i = 0; i < all.length; i++) {
-        if (used[i]) continue;
+    for (let i = 0; i < detections1.length; i++) {
+        if (used1[i]) continue;
 
-        const cluster = [all[i]];
-        used[i] = true;
+        let bestMatchIndex = -1;
+        let bestScore = 0;
 
-        for (let j = i + 1; j < all.length; j++) {
-            if (used[j]) continue;
+        for (let j = 0; j < detections2.length; j++) {
+            if (used2[j]) continue;
 
-            if (areClose(all[i].bbox, all[j].bbox) || iou(all[i].bbox, all[j].bbox) > iouThreshold) {
-                cluster.push(all[j]);
-                used[j] = true;
+            const sameClass = detections1[i].class === detections2[j].class;
+            const closeEnough = areClose(detections1[i].bbox, detections2[j].bbox);
+            const iouVal = iou(detections1[i].bbox, detections2[j].bbox);
+
+            let matchScore = 0;
+            if (sameClass && (closeEnough || iouVal > iouThreshold)) {
+                matchScore = 2; // ідеальний матч
+            } else if (closeEnough || iouVal > iouThreshold) {
+                matchScore = 1; // допустимий матч
+            }
+
+            if (matchScore > bestScore) {
+                bestScore = matchScore;
+                bestMatchIndex = j;
             }
         }
 
-        // Об’єднуємо кластер в один блок
-        const allBoxes = cluster.map(d => d.bbox);
-        const allScores = cluster.map(d => d.score);
-        const allClasses = [...new Set(cluster.map(d => d.class))];
+        if (bestMatchIndex !== -1) {
+            const d1 = detections1[i];
+            const d2 = detections2[bestMatchIndex];
+            used1[i] = true;
+            used2[bestMatchIndex] = true;
 
-        const minX = Math.min(...allBoxes.map(b => b[0]));
-        const minY = Math.min(...allBoxes.map(b => b[1]));
-        const maxX = Math.max(...allBoxes.map(b => b[2]));
-        const maxY = Math.max(...allBoxes.map(b => b[3]));
+            const allBoxes = [d1.bbox, d2.bbox];
+            const allScores = [d1.score, d2.score];
+            const allClasses = [d1.class, d2.class];
 
-        merged.push({
-            bbox: [minX, minY, maxX, maxY],
-            score: (allScores.reduce((a, b) => a + b, 0) / allScores.length).toFixed(2),
-            class: allClasses.length === 1 ? allClasses[0] : allClasses.join(', '),
-            mixed: allClasses.length > 1,
-            count: cluster.length,
-            modelScores: allScores.length > 1 ? {
-                model1: allScores[0].toFixed(2),
-                model2: allScores[1].toFixed(2)
-            }: false
-        });
+            const minX = Math.min(...allBoxes.map(b => b[0]));
+            const minY = Math.min(...allBoxes.map(b => b[1]));
+            const maxX = Math.max(...allBoxes.map(b => b[2]));
+            const maxY = Math.max(...allBoxes.map(b => b[3]));
+
+            merged.push({
+                bbox: [minX, minY, maxX, maxY],
+                score: ((allScores[0] + allScores[1]) / 2).toFixed(2),
+                class: allClasses[0] === allClasses[1] ? allClasses[0] : allClasses.join(', '),
+                mixed: allClasses[0] !== allClasses[1],
+                count: 2,
+                modelScores: {
+                    model1: allScores[0].toFixed(2),
+                    model2: allScores[1].toFixed(2)
+                }
+            });
+        }
     }
+
+    detections1.forEach((det, i) => {
+        if (!used1[i]) merged.push({ ...det, count: 1 });
+    });
+    detections2.forEach((det, i) => {
+        if (!used2[i]) merged.push({ ...det, count: 1 });
+    });
 
     return merged;
 }
 
-
-
-/**
- * Обчислює Intersection over Union для двох bbox
- */
-function calcIOU(boxA, boxB) {
-    const [x1, y1, x2, y2] = boxA;
-    const [x1b, y1b, x2b, y2b] = boxB;
-
-    const xI1 = Math.max(x1, x1b);
-    const yI1 = Math.max(y1, y1b);
-    const xI2 = Math.min(x2, x2b);
-    const yI2 = Math.min(y2, y2b);
-
-    const interArea = Math.max(0, xI2 - xI1) * Math.max(0, yI2 - yI1);
-    const boxAArea = (x2 - x1) * (y2 - y1);
-    const boxBArea = (x2b - x1b) * (y2b - y1b);
-    const union = boxAArea + boxBArea - interArea;
-
-    return interArea / union;
-}
 
 export function renderDetections(ctx, modelData, options = {mode: 'merge', debug: false}) {
     ctx.clearRect(0, 0, ctx.canvas.width, ctx.canvas.height);
@@ -244,7 +253,7 @@ export function renderDetections(ctx, modelData, options = {mode: 'merge', debug
     // console.log('mobilenet', mobilenetDetections[0].bbox);
 
     if (options?.mode === 'merge') {
-        const merged = mergeDetectionsSmart(modelData.yolo, modelData.mobilenet);
+        const merged = mergeDetections2(modelData.yolo, modelData.mobilenet);
         drawDetections(ctx, merged, modelData.yamnet, {
             color: 'cyan',
             debug: options.debug
